@@ -506,8 +506,6 @@ void read_io() {
     sendMQTT(read_ioString, debugTopic);
     last_ioRead=read_ioString;
   }
-  
-  last_ioRead=read_ioString;
   read_ioString=String("");
 }
 
