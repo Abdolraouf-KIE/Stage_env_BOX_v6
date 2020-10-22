@@ -238,6 +238,8 @@ void setup() {
   // Set console baud rate
   // SerialMon.begin(115200);
   // Begin and read from EEPROM the ID of device
+  SerialMon.println("\nInput values for below signals (0 means there is signal):");
+  SerialMon.println("TNB|ELCB|RED|YELLOW|GREEN");
   EEPROM.begin(512);
   if (EEPROM.read(10) == 0xFF)
   {
@@ -468,15 +470,14 @@ void read_io() {
   A3State = digitalRead(Input3);
   A4State = digitalRead(Input4);
   A5State = digitalRead(Input5);   
-    
-  SerialMon.println("\nInput values for below signals (0 means there is signal):");
-  String read_ioString= String("\nInput values for below signals (0 means there is signal):");
-  SerialMon.println("TNB|ELCB|RED|YELLOW|GREEN");
-  read_ioString = read_ioString + String("\nTNB|ELCB|RED|YELLOW|GREEN");
+  
+  String read_ioString="";
+  // String read_ioString= String("\nInput values for below signals (0 means there is signal):");
+  // read_ioString = read_ioString + String("\nTNB|ELCB|RED|YELLOW|GREEN");
   SerialMon.print("|");
-  read_ioString = read_ioString + String("\n|");
+  read_ioString = read_ioString + String("|");
   SerialMon.print("IO State :");
-  read_ioString = read_ioString + String("IO State :");
+  // read_ioString = read_ioString + String("IO State :");
   SerialMon.print(A1State);       //TNB
   read_ioString = read_ioString + String(A1State);
   SerialMon.print("|");
@@ -500,6 +501,7 @@ void read_io() {
   SerialMon.print(read_ioString);
   reconnect();
   sendMQTT(read_ioString, debugTopic);
+  read_ioString=String("");
 }
 
 void sendSms(String smsMessage){
@@ -619,6 +621,62 @@ byte checkGreenStatus(){
   return loop_byte;
 }
 
+byte checkAmberStatus2(){
+  SerialMon.println("XX FUNCTION: checkAmber Flash Status");
+
+  long timerStart=0;
+  long timerNow=0;
+  byte loop_byte = AMBER_FAULTY;
+
+  timerStart = millis();
+
+        for(;;){
+          SerialMon.print("FOR LOOP: checkAmberStatus");
+          read_io();
+          //true only if change state
+          if (A3State == HIGH && A5State == HIGH && A4State == LOW ){
+                SerialMon.println("AMBER LIGHT OK");
+                count++;
+                // loop_byte = AMBER_OK;
+                if (!client.connected()) {
+                 reconnect();
+                }
+                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                checkAmberStatus2();
+                loop_byte = AMBER_OK;
+                break;
+            }
+         if (A3State == HIGH && A5State == LOW && A4State == LOW ){
+                SerialMon.println("AMBER LIGHT OK");
+                count++;
+                loop_byte = AMBER_OK;
+                if (!client.connected()) {
+                 reconnect();
+                }
+                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                checkAmberStatus2();
+                break;
+            }
+          else{
+              SerialMon.print("WRONG STATE: yellow");
+              SerialMon.print("|");
+            }
+          
+          SerialMon.print("yellow Timer: ");
+          timerNow = millis();
+          SerialMon.println((timerNow-timerStart)/1000);
+          
+          if ( (timerNow-timerStart)/1000> 10  ){ //only 10 saat utk amber
+            loop_byte=AMBER_FAULTY;
+            SerialMon.println("yellow_FAULTY: Break");
+            break;
+        }
+        delay(1000);
+      }//foor loop
+      return loop_byte;
+}
+
+
 byte checkAmberStatus(){
   SerialMon.println("06 FUNCTION: checkAmberStatus");
 
@@ -635,11 +693,13 @@ byte checkAmberStatus(){
           if (A3State == HIGH && A5State == HIGH && A4State == LOW ){
                 SerialMon.println("AMBER LIGHT OK");
                 count++;
-                loop_byte = AMBER_OK;
+                // loop_byte = AMBER_OK;
                 if (!client.connected()) {
                  reconnect();
                 }
                 sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                checkAmberStatus2();
+                loop_byte = AMBER_OK;
                 break;
             }
          if (A3State == HIGH && A5State == LOW && A4State == LOW ){
@@ -650,6 +710,7 @@ byte checkAmberStatus(){
                  reconnect();
                 }
                 sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                checkAmberStatus2();
                 break;
             }
           else{
@@ -670,7 +731,7 @@ byte checkAmberStatus(){
       }//foor loop
       return loop_byte;
 }
-    
+
 //byte checkRedStatus(){
 //  SerialMon.println("04 FUNCTION: checkRedStatus");
 //
