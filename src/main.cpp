@@ -41,8 +41,8 @@ String ReportMode= "SMS"; //determines whether use SMS or MQTT. 1 means MQTT.
 //#define SMS_TARGET  "+60109243524"
 // String SMS_TARGET =String("+60183855039");
 
-#define MASA_TUNGGU 120 //tunggu kalau tkde change utk GREEN DAN RED.. report fault
-#define Yellow_Time 120
+#define MASA_TUNGGU 500 //tunggu kalau tkde change utk GREEN DAN RED.. report fault
+#define Yellow_Time 500
 //############################# JGN UBAH LEPAS LINE NI ###########################################################
 #define USERMQTT "2sa34dd5" // Put your Username
 #define PASSMQTT "2sa34dd5" // Put your Password
@@ -57,6 +57,8 @@ String last_AllAlarms=String("");
 // char topic[150];
 
 String topic= "v1/gateway/sms";
+String debugTopic= "v1/gateway/smsserial" ;
+
 String Heartbeat;
 unsigned long previousMillis=0;
 unsigned long currentMillis;
@@ -187,10 +189,12 @@ void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
     Serial.println("Attempting MQTT connection...");
+    // sendMQTT(String("Attempting MQTT connection..."),debugTopic);
     
     // Attemp to connect
     if (client.connect(MQTT_CLIENT_NAME, USERMQTT, PASSMQTT)) {
       Serial.println("Connected");
+      // sendMQTT(String("Connected"),debugTopic);
       // client.subscribe(ID_topic);
     } else {
       Serial.print("Failed, rc=");
@@ -465,18 +469,37 @@ void read_io() {
   A4State = digitalRead(Input4);
   A5State = digitalRead(Input5);   
     
+  SerialMon.println("\nInput values for below signals (0 means there is signal):");
+  String read_ioString= String("\nInput values for below signals (0 means there is signal):");
+  SerialMon.println("TNB|ELCB|RED|YELLOW|GREEN");
+  read_ioString = read_ioString + String("\nTNB|ELCB|RED|YELLOW|GREEN");
   SerialMon.print("|");
+  read_ioString = read_ioString + String("\n|");
   SerialMon.print("IO State :");
+  read_ioString = read_ioString + String("IO State :");
   SerialMon.print(A1State);       //TNB
+  read_ioString = read_ioString + String(A1State);
   SerialMon.print("|");
+  read_ioString = read_ioString + String("|");
   SerialMon.print(A2State);       //ELCB
+  read_ioString = read_ioString + String(A2State);
   SerialMon.print("|");
+  read_ioString = read_ioString + String("|");
   SerialMon.print(A3State);       //RED
+  read_ioString = read_ioString + String(A3State);
   SerialMon.print("|");
+  read_ioString = read_ioString + String("|");
   SerialMon.print(A4State);       //Yellow
+  read_ioString = read_ioString + String(A4State);
   SerialMon.print("|");
+  read_ioString = read_ioString + String("|");
   SerialMon.print(A5State);       //GREEN
-  SerialMon.print("|");   
+  read_ioString = read_ioString + String(A5State);
+  SerialMon.print("|");
+  read_ioString = read_ioString + String("|");
+  SerialMon.print(read_ioString);
+  reconnect();
+  sendMQTT(read_ioString, debugTopic);
 }
 
 void sendSms(String smsMessage){
@@ -501,9 +524,11 @@ byte checkRedStatus(){
 
   for (;;) {
           SerialMon.print("FOR LOOP: checkRedStatus");
+          sendMQTT("FOR LOOP: checkRedStatus", debugTopic);
           read_io();
           if (A4State == HIGH && A5State == HIGH && A3State == LOW){
                 SerialMon.println("RED LIGHT OK");
+                sendMQTT("RED LIGHT OK", debugTopic);
                 loop_byte = RED_OK;
                 if (!client.connected()) {
                   reconnect();
@@ -514,6 +539,7 @@ byte checkRedStatus(){
           
           if (A4State == LOW && A5State == HIGH && A3State == LOW){
                 SerialMon.println("RED LIGHT OK");
+                sendMQTT("RED LIGHT OK", debugTopic);
                 loop_byte = RED_OK;
                 if (!client.connected()) {
                   reconnect();
@@ -525,6 +551,7 @@ byte checkRedStatus(){
           else{
               SerialMon.print("WRONG STATE: RED");
               SerialMon.print("|");
+              // sendMQTT("RED LIGHT OK", debugTopic);
           }
           
           SerialMon.print("Timer: ");
