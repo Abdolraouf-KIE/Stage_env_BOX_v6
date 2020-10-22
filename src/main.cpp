@@ -43,6 +43,7 @@ String ReportMode= "SMS"; //determines whether use SMS or MQTT. 1 means MQTT.
 
 #define MASA_TUNGGU 500 //tunggu kalau tkde change utk GREEN DAN RED.. report fault
 #define Yellow_Time 500
+String last_ioRead="";
 //############################# JGN UBAH LEPAS LINE NI ###########################################################
 #define USERMQTT "2sa34dd5" // Put your Username
 #define PASSMQTT "2sa34dd5" // Put your Password
@@ -499,8 +500,14 @@ void read_io() {
   SerialMon.print("|");
   read_ioString = read_ioString + String("|");
   SerialMon.print(read_ioString);
-  reconnect();
-  sendMQTT(read_ioString, debugTopic);
+  if (read_ioString!=last_ioRead)
+  {
+    reconnect();
+    sendMQTT(read_ioString, debugTopic);
+    last_ioRead=read_ioString;
+  }
+  
+  last_ioRead=read_ioString;
   read_ioString=String("");
 }
 
