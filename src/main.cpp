@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #define ESP32_RTOS  // Uncomment this line if you want to use the code with freertos (only works on the ESP32)
 #define lightseq
+byte checkAmberStatus2();
 
 unsigned long entry;
 /*
@@ -41,8 +42,8 @@ String ReportMode= "SMS"; //determines whether use SMS or MQTT. 1 means MQTT.
 //#define SMS_TARGET  "+60109243524"
 // String SMS_TARGET =String("+60183855039");
 
-#define MASA_TUNGGU 500 //tunggu kalau tkde change utk GREEN DAN RED.. report fault
-#define Yellow_Time 500
+#define MASA_TUNGGU 100 //tunggu kalau tkde change utk GREEN DAN RED.. report fault
+#define Yellow_Time 100
 String last_ioRead="";
 //############################# JGN UBAH LEPAS LINE NI ###########################################################
 #define USERMQTT "2sa34dd5" // Put your Username
@@ -531,11 +532,11 @@ byte checkRedStatus(){
 
   for (;;) {
           SerialMon.print("FOR LOOP: checkRedStatus");
-          sendMQTT("FOR LOOP: checkRedStatus", debugTopic);
+          // sendMQTT("FOR LOOP: checkRedStatus", debugTopic);
           read_io();
           if (A4State == HIGH && A5State == HIGH && A3State == LOW){
                 SerialMon.println("RED LIGHT OK");
-                sendMQTT("RED LIGHT OK", debugTopic);
+                // sendMQTT("RED LIGHT OK", debugTopic);
                 loop_byte = RED_OK;
                 if (!client.connected()) {
                   reconnect();
@@ -546,7 +547,7 @@ byte checkRedStatus(){
           
           if (A4State == LOW && A5State == HIGH && A3State == LOW){
                 SerialMon.println("RED LIGHT OK");
-                sendMQTT("RED LIGHT OK", debugTopic);
+                // sendMQTT("RED LIGHT OK", debugTopic);
                 loop_byte = RED_OK;
                 if (!client.connected()) {
                   reconnect();
@@ -559,6 +560,8 @@ byte checkRedStatus(){
               SerialMon.print("WRONG STATE: RED");
               SerialMon.print("|");
               // sendMQTT("RED LIGHT OK", debugTopic);
+              // check for Amber flashing
+              checkAmberStatus2();
           }
           
           SerialMon.print("Timer: ");
@@ -610,6 +613,8 @@ byte checkGreenStatus(){
               else{
                   SerialMon.print("WRONG STATE: GREEN");
                   SerialMon.print("|");
+                  //check for Amber status
+                  checkAmberStatus2();
                 }
               
               SerialMon.print("GREEN Timer: ");
@@ -646,7 +651,7 @@ byte checkAmberStatus2(){
                 if (!client.connected()) {
                  reconnect();
                 }
-                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                sendMQTT("Heartbeat: TNB:0, ELCB:0, AmberFlashing: true", topic);
                 checkAmberStatus2();
                 loop_byte = AMBER_OK;
                 break;
@@ -671,7 +676,7 @@ byte checkAmberStatus2(){
           timerNow = millis();
           SerialMon.println((timerNow-timerStart)/1000);
           
-          if ( (timerNow-timerStart)/1000> 10  ){ //only 10 saat utk amber
+          if ( (timerNow-timerStart)/1000> 1  ){ //only 10 saat utk amber
             loop_byte=AMBER_FAULTY;
             SerialMon.println("yellow_FAULTY: Break");
             break;
