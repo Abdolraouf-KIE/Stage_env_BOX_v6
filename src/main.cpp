@@ -842,7 +842,7 @@ byte checkAmberStatus(){
                 }
                 sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: yellow", topic);
                 checkAmberStatus2();
-                break;
+                break; //asdsa
             }
           else{
               SerialMon.print("WRONG STATE: yellow");
