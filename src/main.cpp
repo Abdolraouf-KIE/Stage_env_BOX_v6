@@ -7,8 +7,9 @@
 #define ESP32_RTOS  // Uncomment this line if you want to use the code with freertos (only works on the ESP32)
 #define lightseq
 byte checkAmberStatus2();
-
+void checkPinStatus();
 unsigned long entry;
+bool flashingStatus=0;
 /*
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/esp32-sim800l-send-text-messages-sms/
@@ -42,8 +43,8 @@ String ReportMode= "SMS"; //determines whether use SMS or MQTT. 1 means MQTT.
 //#define SMS_TARGET  "+60109243524"
 // String SMS_TARGET =String("+60183855039");
 
-#define MASA_TUNGGU 100 //tunggu kalau tkde change utk GREEN DAN RED.. report fault
-#define Yellow_Time 100
+#define MASA_TUNGGU 720 //tunggu kalau tkde change utk GREEN DAN RED.. report fault
+#define Yellow_Time 720 //time in seconds after multiplied by 5 so 720 means 3600s.
 String last_ioRead="";
 //############################# JGN UBAH LEPAS LINE NI ###########################################################
 #define USERMQTT "2sa34dd5" // Put your Username
@@ -201,9 +202,9 @@ void reconnect() {
     } else {
       Serial.print("Failed, rc=");
       Serial.print(client.state());
-      Serial.println(" try again in 2 seconds");
+      Serial.println(" try again in 0.5 seconds");
       // Wait 2 seconds before retrying
-      delay(2000);
+      delay(500);
     }
   }
 }
@@ -500,7 +501,7 @@ void read_io() {
   read_ioString = read_ioString + String(A5State);
   SerialMon.print("|");
   read_ioString = read_ioString + String("|");
-  SerialMon.print(read_ioString);
+  // SerialMon.print(read_ioString);
   if (read_ioString!=last_ioRead)
   {
     reconnect();
@@ -541,7 +542,8 @@ byte checkRedStatus(){
                 if (!client.connected()) {
                   reconnect();
                 }
-                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: Red", topic);
+                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Red", topic);
+                flashingStatus=false;
                 break;
           }
           
@@ -552,7 +554,8 @@ byte checkRedStatus(){
                 if (!client.connected()) {
                   reconnect();
                 }
-                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: Red", topic);
+                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Red", topic);
+                flashingStatus=false;
                 break;
           }
           
@@ -598,7 +601,8 @@ byte checkGreenStatus(){
                     if (!client.connected()) {
                       reconnect();
                     }
-                    sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: Green", topic);
+                    sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Green", topic);
+                    flashingStatus=false;
                     break;
                 }
               if (A3State == LOW && A4State == HIGH && A5State == LOW ){
@@ -607,7 +611,8 @@ byte checkGreenStatus(){
                     if (!client.connected()) {
                       reconnect();
                     }
-                    sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: Green", topic);
+                    sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Green", topic);
+                    flashingStatus=false;
                     break;
                }
               else{
@@ -633,7 +638,9 @@ byte checkGreenStatus(){
 
 byte checkAmberStatus2(){
   SerialMon.println("XX FUNCTION: checkAmber Flash Status");
-
+  if (!client.connected()) {
+      reconnect();
+    }
   long timerStart=0;
   long timerNow=0;
   byte loop_byte = AMBER_FAULTY;
@@ -644,26 +651,38 @@ byte checkAmberStatus2(){
           SerialMon.print("FOR LOOP: checkAmberStatus");
           read_io();
           //true only if change state
-          if (A3State == HIGH && A5State == HIGH && A4State == LOW ){
+          if (A3State == HIGH && A5State == HIGH && A4State == LOW && !flashingStatus){
                 SerialMon.println("AMBER LIGHT OK");
-                count++;
+                // count++;
                 // loop_byte = AMBER_OK;
-                if (!client.connected()) {
+
+                if (count==0)
+                {
+                 if (!client.connected()) {
                  reconnect();
+                  }
+                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
+                count++;
+                flashingStatus=true;
                 }
-                sendMQTT("Heartbeat: TNB:0, ELCB:0, AmberFlashing: true", topic);
+                delay(2000);
                 checkAmberStatus2();
                 loop_byte = AMBER_OK;
                 break;
             }
-         if (A3State == HIGH && A5State == LOW && A4State == LOW ){
+         if (A3State == HIGH && A5State == LOW && A4State == LOW && !flashingStatus){
                 SerialMon.println("AMBER LIGHT OK");
-                count++;
                 loop_byte = AMBER_OK;
-                if (!client.connected()) {
+                if (count==0)
+                {
+                 if (!client.connected()) {
                  reconnect();
+                  }
+                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
+                count++;
+                flashingStatus=true;
                 }
-                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                delay(2000);                
                 checkAmberStatus2();
                 break;
             }
@@ -676,12 +695,113 @@ byte checkAmberStatus2(){
           timerNow = millis();
           SerialMon.println((timerNow-timerStart)/1000);
           
-          if ( (timerNow-timerStart)/1000> 1  ){ //only 10 saat utk amber
+          if ( (timerNow-timerStart)/1000> 2  ){ //only 10 saat utk amber
             loop_byte=AMBER_FAULTY;
             SerialMon.println("yellow_FAULTY: Break");
+            count=0; 
+            //lets check for TNB and ELCB
+/*******************************************************************************************/
+            SerialMon.print("02 FUNCTION: check TNB & ELCB");
+            SerialMon.println("");
+              if (A1State != lastA1State) {
+                if (A1State == HIGH){
+                if(ReportMode==String("SMS")){
+                }
+
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                  count=0;
+                  checkPinStatus();
+
+                }
+                }
+                else{
+                if(ReportMode==String("SMS")){
+                }
+                  
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                }
+                }
+              }
+              else if(ReportMode==String("MQTT"))
+              {
+                if (A1State == HIGH){
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                count=0;
+                checkPinStatus();
+                }
+                else{
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                }
+              }
+              
+              lastA1State = A1State;
+
+              if (A1State == LOW /*&& A2State != lastA2State*/){
+                if (A2State == HIGH){
+                if(ReportMode==String("SMS")){
+                //   if (A2State != lastA2State)
+                //   {
+                //   SerialMon.println("TRYSENDSMS: ELCB=TRIP");
+                //   myString = String(ID) + "\nELCB=TRIP";
+                //   sendSms(myString);
+                //   }
+                }
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(1) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                count=0;
+                checkPinStatus();
+                }
+                }
+                else{
+                if(ReportMode==String("SMS")){
+                //  if (A2State != lastA2State)
+                //  {
+                //   SerialMon.println("TRYSENDSMS: ELCB=OK");
+                //   myString = String(ID) + "\nELCB=OK";
+                //   sendSms(myString);
+                //  }
+                }
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.print(AllAlarms);
+                }
+                }
+              }
+              
+              
+              else if(ReportMode==String("MQTT"))
+              {
+                if (A2State == HIGH){
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(1) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                count=0;
+                checkPinStatus();
+                }
+                else{
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.print(AllAlarms);
+              }
+              }
+  /*******************************************************************************************/
             break;
         }
         delay(1000);
+      
       }//foor loop
       return loop_byte;
 }
@@ -702,12 +822,13 @@ byte checkAmberStatus(){
           //true only if change state
           if (A3State == HIGH && A5State == HIGH && A4State == LOW ){
                 SerialMon.println("AMBER LIGHT OK");
-                count++;
+                // count++;
                 // loop_byte = AMBER_OK;
                 if (!client.connected()) {
                  reconnect();
                 }
-                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: yellow", topic);
+                delay(10000);
                 checkAmberStatus2();
                 loop_byte = AMBER_OK;
                 break;
@@ -719,13 +840,114 @@ byte checkAmberStatus(){
                 if (!client.connected()) {
                  reconnect();
                 }
-                sendMQTT("Heartbeat: TNB:0, ELCB:0, Colour: yellow", topic);
+                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: yellow", topic);
                 checkAmberStatus2();
                 break;
             }
           else{
               SerialMon.print("WRONG STATE: yellow");
               SerialMon.print("|");
+
+            //lets check for TNB and ELCB
+/*******************************************************************************************/
+            SerialMon.print("02 FUNCTION: check TNB & ELCB");
+            SerialMon.println("");
+              if (A1State != lastA1State) {
+                if (A1State == HIGH){
+                if(ReportMode==String("SMS")){
+                }
+
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                  count=0;
+                  checkPinStatus();
+
+                }
+                }
+                else{
+                if(ReportMode==String("SMS")){
+                }
+                  
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                }
+                }
+              }
+              else if(ReportMode==String("MQTT"))
+              {
+                if (A1State == HIGH){
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                count=0;
+                checkPinStatus();
+                }
+                else{
+                //   AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+                //   SerialMon.print("TNB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                }
+              }
+              
+              lastA1State = A1State;
+
+              if (A1State == LOW /*&& A2State != lastA2State*/){
+                if (A2State == HIGH){
+                if(ReportMode==String("SMS")){
+                //   if (A2State != lastA2State)
+                //   {
+                //   SerialMon.println("TRYSENDSMS: ELCB=TRIP");
+                //   myString = String(ID) + "\nELCB=TRIP";
+                //   sendSms(myString);
+                //   }
+                }
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(1) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                count=0;
+                checkPinStatus();
+                }
+                }
+                else{
+                if(ReportMode==String("SMS")){
+                //  if (A2State != lastA2State)
+                //  {
+                //   SerialMon.println("TRYSENDSMS: ELCB=OK");
+                //   myString = String(ID) + "\nELCB=OK";
+                //   sendSms(myString);
+                //  }
+                }
+                if(ReportMode==String("MQTT")){
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.print(AllAlarms);
+                }
+                }
+              }
+              
+              
+              else if(ReportMode==String("MQTT"))
+              {
+                if (A2State == HIGH){
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(1) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.println(AllAlarms);
+                count=0;
+                checkPinStatus();
+                }
+                else{
+                //   AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+                //   SerialMon.print("ELCB check, AllAlarms: ");
+                //   SerialMon.print(AllAlarms);
+              }
+              }
+  /*******************************************************************************************/
+
             }
           
           SerialMon.print("yellow Timer: ");
@@ -1062,7 +1284,7 @@ if(ReportMode==String("MQTT")) {
   if (!client.connected()) {
       reconnect();
   }
-    //  sendMQTT(AllAlarms, topic);
+     sendMQTT(AllAlarms, topic);
      last_AllAlarms=AllAlarms;
  }
   else if ((unsigned long)(currentMillis - previousMillis) >= interval) {
