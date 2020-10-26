@@ -656,15 +656,15 @@ byte checkAmberStatus2(){
                 // count++;
                 // loop_byte = AMBER_OK;
 
-                if (count==0)
+                if (count==2)
                 {
                  if (!client.connected()) {
                  reconnect();
                   }
                 sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
-                count++;
                 flashingStatus=true;
                 }
+                count++;
                 delay(2000);
                 checkAmberStatus2();
                 loop_byte = AMBER_OK;
@@ -673,15 +673,15 @@ byte checkAmberStatus2(){
          if (A3State == HIGH && A5State == LOW && A4State == LOW && !flashingStatus){
                 SerialMon.println("AMBER LIGHT OK");
                 loop_byte = AMBER_OK;
-                if (count==0)
+                if (count==2)
                 {
                  if (!client.connected()) {
                  reconnect();
                   }
                 sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
-                count++;
                 flashingStatus=true;
                 }
+                count++;
                 delay(2000);                
                 checkAmberStatus2();
                 break;
