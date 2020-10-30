@@ -3,13 +3,24 @@
 // commment:     to add 
 //                  a)Change of phone number
 //                  b)Change of mode of operation
+// String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String(TNB) + String(", \"ELCB\":") + String(ELCB) +String(",\"Colour\":\"Red\",\"Light\":0, \"AmberFlashing\":1}}]}")
+// 
+// 
+// 
+// 
 #include <Arduino.h>
+#include <TimeLib.h>
 #define ESP32_RTOS  // Uncomment this line if you want to use the code with freertos (only works on the ESP32)
 #define lightseq
 byte checkAmberStatus2();
 void checkPinStatus();
 unsigned long entry;
 bool flashingStatus=0;
+//for getting epochtime
+const char* UnixTime_topic= "datetimeonly";
+String MQTTdateTime="";
+unsigned long int intMQTTdateTime=0;
+unsigned long Zeromillis=0;
 /*
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/esp32-sim800l-send-text-messages-sms/
@@ -65,7 +76,7 @@ String debugTopic= "v1/gateway/smsserial" ;
 String Heartbeat;
 unsigned long previousMillis=0;
 unsigned long currentMillis;
-unsigned long interval=60000; //interval for heartbeat
+unsigned long interval=600000; //interval for heartbeat
 
 // SIM card PIN (leave empty, if not defined)
 const char simPIN[]   = "";
@@ -234,6 +245,16 @@ void sendMQTT(String MQTTMessage, String MQTTtopic){
   else{
     SerialMon.println("INFO: MQTT failed to send");
   }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int len) {
+  // changing to String
+  char p[len + 1];
+  memcpy(p, payload, len);
+  p[len] = NULL;
+  String message(p);
+  SerialMon.println(String("###MessageString= ") + String(message));
+  MQTTdateTime=message;
 }
 /****************************************/
 
@@ -455,12 +476,45 @@ void setup() {
     }
 
     // MQTT Broker setup
+    client.setBufferSize(400);
+    Serial.print("client.getBufferSize() ");
+    Serial.println(client.getBufferSize());
     client.setServer(mqttBroker, 8883);
-    // client.setCallback(callback); 
+    client.setCallback(mqttCallback); 
 
-      // test MQTT upon setup
+      // test MQTT upon setup and get unix time
+    if (!client.connected()) {
     reconnect();
-    sendMQTT("TestMQTT", topic);
+    }
+    SerialMon.print("Attempting to connect subscribe: ");
+    Serial.println(client.subscribe(UnixTime_topic));
+    
+    while(MQTTdateTime==""){
+      client.loop();
+    }
+    Zeromillis=millis();
+    client.unsubscribe(UnixTime_topic);
+    delay(2000);
+    Serial.print("MQTTdateTime: ");
+    Serial.println(MQTTdateTime);
+
+    //convert to int
+    for(int i=0; i<10; i++)
+    {
+      intMQTTdateTime = intMQTTdateTime * 10 + ( MQTTdateTime[i] - '0' );
+    }
+    SerialMon.print("\nintMQTTdateTime: ");
+    SerialMon.println(intMQTTdateTime);
+    //Malaysian time needs to add 8 hours
+    intMQTTdateTime = intMQTTdateTime + 28800;
+    SerialMon.print("\nt_unix_date2:(MY) ");
+    printf("\nDate2: %4d-%02d-%02d %02d:%02d:%02d\n", year(intMQTTdateTime), month(intMQTTdateTime), day(intMQTTdateTime), hour(intMQTTdateTime), minute(intMQTTdateTime), second(intMQTTdateTime));
+    
+    //sending test MQTT message
+    if (!client.connected()) {
+    reconnect();
+    }
+    sendMQTT(String (String("TestMQTT ts:")+ String(intMQTTdateTime)), topic);
 
   }//sending MQTT
 /****************************************/
@@ -505,9 +559,14 @@ void read_io() {
   // SerialMon.print(read_ioString);
   if (read_ioString!=last_ioRead)
   {
+    // String("{" + ID + ": [{\"ts\": " + String(ts) + "values\": {\"TNB\":0, "ELCB":0,"Colour":"Red","Light":0, "AmberFlashing":"false"}}]}
     reconnect();
-    sendMQTT(read_ioString, debugTopic);
+    // sendMQTT(read_ioString, debugTopic);
     last_ioRead=read_ioString;
+    intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+    read_ioString=String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"-1\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String(read_ioString)+String("\"}}]}");
+    // read_ioString=String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String(TNB) + String(", \"ELCB\":") + String(ELCB) +String(",\"Colour\":\"Red\",\"Light\":0, \"AmberFlashing\":1}}]}");
+    sendMQTT(read_ioString,topic);
   }
   read_ioString=String("");
 }
@@ -543,7 +602,9 @@ byte checkRedStatus(){
                 if (!client.connected()) {
                   reconnect();
                 }
-                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Red", topic);
+                // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Red", topic);
+                intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"Red\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                 flashingStatus=false;
                 break;
           }
@@ -555,7 +616,9 @@ byte checkRedStatus(){
                 if (!client.connected()) {
                   reconnect();
                 }
-                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Red", topic);
+                // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Red", topic);
+                intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"Red\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                 flashingStatus=false;
                 break;
           }
@@ -602,7 +665,9 @@ byte checkGreenStatus(){
                     if (!client.connected()) {
                       reconnect();
                     }
-                    sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Green", topic);
+                    // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Green", topic);
+                  intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                  sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"Green\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                     flashingStatus=false;
                     break;
                 }
@@ -612,7 +677,9 @@ byte checkGreenStatus(){
                     if (!client.connected()) {
                       reconnect();
                     }
-                    sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Green", topic);
+                    // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: Green", topic);
+                    intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                    sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"Green\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                     flashingStatus=false;
                     break;
                }
@@ -646,6 +713,39 @@ byte checkAmberStatus2(){
   long timerNow=0;
   byte loop_byte = AMBER_FAULTY;
 
+//get epoch time every 10 minutes
+  if ((unsigned long)(millis()-Zeromillis)>interval)
+  {
+    // getEpochTime(intMQTTdateTime);
+    if (!client.connected()) {
+    reconnect();
+    }
+    SerialMon.print("Attempting to connect subscribe: ");
+    Serial.println(client.subscribe(UnixTime_topic));
+    
+    while(MQTTdateTime==""){
+      client.loop();
+    }
+    Zeromillis=millis();
+    client.unsubscribe(UnixTime_topic);
+    delay(2000);
+    Serial.print("MQTTdateTime: ");
+    Serial.println(MQTTdateTime);
+
+    //convert to int
+    for(int i=0; i<10; i++)
+    {
+      intMQTTdateTime = intMQTTdateTime * 10 + ( MQTTdateTime[i] - '0' );
+    }
+    SerialMon.print("\nintMQTTdateTime: ");
+    SerialMon.println(intMQTTdateTime);
+    //Malaysian time needs to add 8 hours
+    intMQTTdateTime = intMQTTdateTime + 28800;
+    SerialMon.print("\nt_unix_date2:(MY) ");
+    printf("\nDate2: %4d-%02d-%02d %02d:%02d:%02d\n", year(intMQTTdateTime), month(intMQTTdateTime), day(intMQTTdateTime), hour(intMQTTdateTime), minute(intMQTTdateTime), second(intMQTTdateTime));
+    //************************************************************************************
+  }
+
   timerStart = millis();
 
         for(;;){
@@ -662,7 +762,9 @@ byte checkAmberStatus2(){
                  if (!client.connected()) {
                  reconnect();
                   }
-                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
+                // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
+                intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"-1\",\"Light\":-1, \"AmberFlashing\":0, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                 flashingStatus=true;
                 }
                 count++;
@@ -679,7 +781,9 @@ byte checkAmberStatus2(){
                  if (!client.connected()) {
                  reconnect();
                   }
-                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
+                // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, AmberFlashing: true", topic);
+                intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"-1\",\"Light\":-1, \"AmberFlashing\":0, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                 flashingStatus=true;
                 }
                 count++;
@@ -828,7 +932,9 @@ byte checkAmberStatus(){
                 if (!client.connected()) {
                  reconnect();
                 }
-                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: yellow", topic);
+                // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: yellow", topic);
+                intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"Yellow\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                 delay(10000);
                 checkAmberStatus2();
                 loop_byte = AMBER_OK;
@@ -841,7 +947,9 @@ byte checkAmberStatus(){
                 if (!client.connected()) {
                  reconnect();
                 }
-                sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: yellow", topic);
+                // sendMQTT("Heartbeat: ID:"+String(ID)+" TNB:0, ELCB:0, Colour: yellow", topic);
+                intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+                sendMQTT(String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"Yellow\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}"),topic);
                 checkAmberStatus2();
                 break; //asdsa
             }
@@ -1145,7 +1253,8 @@ void checkPinStatus(){
      }
 
      if(ReportMode==String("MQTT")){
-      AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+      // AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+      AllAlarms=String(", \"values\": {\"TNB\":") + String("1"); 
       SerialMon.print("TNB check, AllAlarms: ");
       SerialMon.println(AllAlarms);
      }
@@ -1158,7 +1267,8 @@ void checkPinStatus(){
      }
       
      if(ReportMode==String("MQTT")){
-      AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+      // AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+      AllAlarms=String(", \"values\": {\"TNB\":") + String("0"); 
       SerialMon.print("TNB check, AllAlarms: ");
       SerialMon.println(AllAlarms);
      }
@@ -1167,12 +1277,14 @@ void checkPinStatus(){
   else if(ReportMode==String("MQTT"))
   {
     if (A1State == HIGH){
-      AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+      // AllAlarms = AllAlarms+ String("\"TNB\":") + String(1) +String(" ,");
+      AllAlarms=String(", \"values\": {\"TNB\":") + String("1"); 
       SerialMon.print("TNB check, AllAlarms: ");
       SerialMon.println(AllAlarms);
     }
     else{
-      AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+      // AllAlarms = AllAlarms+ String("\"TNB\":") + String(0) +String(" ,");
+      AllAlarms=String(", \"values\": {\"TNB\":") + String("0"); 
       SerialMon.print("TNB check, AllAlarms: ");
       SerialMon.println(AllAlarms);
     }
@@ -1191,7 +1303,8 @@ void checkPinStatus(){
       }
      }
      if(ReportMode==String("MQTT")){
-      AllAlarms = AllAlarms+ String("\"ELCB\":") + String(1) +String(" ,");
+      // AllAlarms = AllAlarms+ String(",\"ELCB\":") + String(1) +String(" ,");
+      AllAlarms = AllAlarms+ String(",\"ELCB\":") + String(1) +String(" ,");
       SerialMon.print("ELCB check, AllAlarms: ");
       SerialMon.println(AllAlarms);
      }
@@ -1206,7 +1319,8 @@ void checkPinStatus(){
      }
      }
      if(ReportMode==String("MQTT")){
-      AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+      // AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+      AllAlarms = AllAlarms+ String(",\"ELCB\":") + String(0) +String(" ,");
       SerialMon.print("ELCB check, AllAlarms: ");
       SerialMon.print(AllAlarms);
      }
@@ -1217,12 +1331,14 @@ void checkPinStatus(){
   else if(ReportMode==String("MQTT"))
   {
     if (A2State == HIGH){
-      AllAlarms = AllAlarms+ String("\"ELCB\":") + String(1) +String(" ,");
+      // AllAlarms = AllAlarms+ String("\"ELCB\":") + String(1) +String(" ,");
+      AllAlarms = AllAlarms+ String(",\"ELCB\":") + String(1) +String(" ,");
       SerialMon.print("ELCB check, AllAlarms: ");
       SerialMon.println(AllAlarms);
     }
     else{
-      AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+      // AllAlarms = AllAlarms+ String("\"ELCB\":") + String(0) +String(" ,");
+      AllAlarms = AllAlarms+ String(",\"ELCB\":") + String(0) +String(" ,");
       SerialMon.print("ELCB check, AllAlarms: ");
       SerialMon.print(AllAlarms);
   }
@@ -1247,7 +1363,8 @@ void checkPinStatus(){
         }
 
         if(ReportMode==String("MQTT")){
-          AllAlarms = AllAlarms+ String("\"Light\":") + String(0) + String("}}]}"); //last state so no comma needed
+          // AllAlarms = AllAlarms+ String("\"Light\":") + String(0) + String("}}]}"); //last state so no comma needed
+          AllAlarms=AllAlarms+String("\"Colour\":\"-1\",\"Light\":0, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}");
           SerialMon.print("Light check, AllAlarms: ");
           SerialMon.println(AllAlarms);
         }
@@ -1265,7 +1382,8 @@ void checkPinStatus(){
          }
 
          if(ReportMode==String("MQTT")){
-          AllAlarms = AllAlarms+ String("\"Light\":") + String(1) + String("}}]}"); //last state so no comma needed
+          // AllAlarms = AllAlarms+ String("\"Light\":") + String(1) + String("}}]}"); //last state so no comma needed
+          AllAlarms=AllAlarms+String("\"Colour\":\"-1\",\"Light\":1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}");
           SerialMon.print("Light check, AllAlarms: ");
           SerialMon.println(AllAlarms);
          }
@@ -1275,7 +1393,8 @@ void checkPinStatus(){
 
   else if(ReportMode==String("MQTT"))
   {
-          AllAlarms = AllAlarms+ String("\"Light\":") + String(0) + String("}}]}"); //last state so no comma needed
+          // AllAlarms = AllAlarms+ String("\"Light\":") + String(0) + String("}}]}"); //last state so no comma needed
+          AllAlarms=AllAlarms+String("\"Colour\":\"-1\",\"Light\":0, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}");
           SerialMon.print("Light check, AllAlarms: ");
           SerialMon.println(AllAlarms);
   }
@@ -1285,19 +1404,21 @@ if(ReportMode==String("MQTT")) {
   if (!client.connected()) {
       reconnect();
   }
+     intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+     AllAlarms= String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ AllAlarms ;
      sendMQTT(AllAlarms, topic);
      last_AllAlarms=AllAlarms;
  }
   else if ((unsigned long)(currentMillis - previousMillis) >= interval) {
     // It's time to do something!
-    Heartbeat=String("Heartbeat") +AllAlarms;
-    if (!client.connected()) {
-      reconnect();
-      }
-    // sendMQTT(Heartbeat, topic);
+    // Heartbeat=String("Heartbeat") +AllAlarms;
+    // if (!client.connected()) {
+    //   reconnect();
+    //   }
+    // // sendMQTT(Heartbeat, topic);
  
       // Use the snapshot to set track time until next event
-      previousMillis = currentMillis;
+      // previousMillis = currentMillis;
    }
  
  
@@ -1306,7 +1427,7 @@ if(ReportMode==String("MQTT")) {
 }
 
 void loop() {
-  currentMillis = millis();
+  // currentMillis = millis();
   // if (!client.connected()) {
   //     reconnect();
   // }
