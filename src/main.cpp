@@ -716,6 +716,8 @@ byte checkAmberStatus2(){
 //get epoch time every 10 minutes
   if ((unsigned long)(millis()-Zeromillis)>interval)
   {
+    intMQTTdateTime=0;
+    MQTTdateTime="";
     // getEpochTime(intMQTTdateTime);
     if (!client.connected()) {
     reconnect();
@@ -1404,10 +1406,16 @@ if(ReportMode==String("MQTT")) {
   if (!client.connected()) {
       reconnect();
   }
+     //checking
+     Serial.print("last_AllAlarms: ");
+     Serial.println(last_AllAlarms);
+     Serial.println("AllAlarms: ");
+     Serial.println(AllAlarms);
+     last_AllAlarms=AllAlarms;
+
      intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
      AllAlarms= String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ AllAlarms ;
      sendMQTT(AllAlarms, topic);
-     last_AllAlarms=AllAlarms;
  }
   else if ((unsigned long)(currentMillis - previousMillis) >= interval) {
     // It's time to do something!
@@ -1422,7 +1430,7 @@ if(ReportMode==String("MQTT")) {
    }
  
  
-    AllAlarms=String("");
+    // AllAlarms=String("");
   }
 }
 
