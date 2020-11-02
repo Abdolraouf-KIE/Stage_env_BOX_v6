@@ -9,7 +9,7 @@
 // 
 // 
 #include <Arduino.h>
-#include <TimeLib.h>
+// #include <TimeLib.h>
 #define ESP32_RTOS  // Uncomment this line if you want to use the code with freertos (only works on the ESP32)
 #define lightseq
 byte checkAmberStatus2();
@@ -87,7 +87,7 @@ const char simPIN[]   = "";
 #include <Wire.h>
 #include <TinyGsmClient.h>
 #include <PubSubClient.h>
-
+// #include <Time.h>
 
 // TTGO T-Call pins
 #define MODEM_RST            5
@@ -508,7 +508,7 @@ void setup() {
     //Malaysian time needs to add 8 hours
     intMQTTdateTime = intMQTTdateTime + 28800;
     SerialMon.print("\nt_unix_date2:(MY) ");
-    printf("\nDate2: %4d-%02d-%02d %02d:%02d:%02d\n", year(intMQTTdateTime), month(intMQTTdateTime), day(intMQTTdateTime), hour(intMQTTdateTime), minute(intMQTTdateTime), second(intMQTTdateTime));
+    // printf("\nDate2: %4d-%02d-%02d %02d:%02d:%02d\n", year(intMQTTdateTime), month(intMQTTdateTime), day(intMQTTdateTime), hour(intMQTTdateTime), minute(intMQTTdateTime), second(intMQTTdateTime));
     
     //sending test MQTT message
     if (!client.connected()) {
@@ -744,7 +744,7 @@ byte checkAmberStatus2(){
     //Malaysian time needs to add 8 hours
     intMQTTdateTime = intMQTTdateTime + 28800;
     SerialMon.print("\nt_unix_date2:(MY) ");
-    printf("\nDate2: %4d-%02d-%02d %02d:%02d:%02d\n", year(intMQTTdateTime), month(intMQTTdateTime), day(intMQTTdateTime), hour(intMQTTdateTime), minute(intMQTTdateTime), second(intMQTTdateTime));
+    // printf("\nDate2: %4d-%02d-%02d %02d:%02d:%02d\n", year(intMQTTdateTime), month(intMQTTdateTime), day(intMQTTdateTime), hour(intMQTTdateTime), minute(intMQTTdateTime), second(intMQTTdateTime));
     //************************************************************************************
   }
 
