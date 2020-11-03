@@ -564,7 +564,7 @@ void read_io() {
     // sendMQTT(read_ioString, debugTopic);
     last_ioRead=read_ioString;
     intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
-    read_ioString=String("{\"") + String(ID)+ String("\": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"-1\",\"Light\":-1, \"AmberFlashing\":1, \"smsserial\": \"")+String(read_ioString)+String("\"}}]}");
+    read_ioString=String("{\"") + String(ID)+ String("\": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"-1\",\"Light\":-1, \"AmberFlashing\":-1, \"smsserial\": \"")+String(read_ioString)+String("\"}}]}");
     // read_ioString=String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String(TNB) + String(", \"ELCB\":") + String(ELCB) +String(",\"Colour\":\"Red\",\"Light\":0, \"AmberFlashing\":1}}]}");
     sendMQTT(read_ioString,topic);
   }
@@ -1385,7 +1385,7 @@ void checkPinStatus(){
 
          if(ReportMode==String("MQTT")){
           // AllAlarms = AllAlarms+ String("\"Light\":") + String(1) + String("}}]}"); //last state so no comma needed
-          AllAlarms=AllAlarms+String("\"Colour\":\"-1\",\"Light\":1, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}");
+          AllAlarms=AllAlarms+String("\"Colour\":\"-1\",\"Light\":1, \"AmberFlashing\":-1, \"smsserial\": \"")+String("-1")+String("\"}}]}");
           SerialMon.print("Light check, AllAlarms: ");
           SerialMon.println(AllAlarms);
          }
@@ -1396,7 +1396,7 @@ void checkPinStatus(){
   else if(ReportMode==String("MQTT"))
   {
           // AllAlarms = AllAlarms+ String("\"Light\":") + String(0) + String("}}]}"); //last state so no comma needed
-          AllAlarms=AllAlarms+String("\"Colour\":\"-1\",\"Light\":0, \"AmberFlashing\":1, \"smsserial\": \"")+String("-1")+String("\"}}]}");
+          AllAlarms=AllAlarms+String("\"Colour\":\"-1\",\"Light\":0, \"AmberFlashing\":-1, \"smsserial\": \"")+String("-1")+String("\"}}]}");
           SerialMon.print("Light check, AllAlarms: ");
           SerialMon.println(AllAlarms);
   }
