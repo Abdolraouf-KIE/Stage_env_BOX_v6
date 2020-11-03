@@ -1,4 +1,3 @@
-//jyhy
 // Status:      Fully operational 
 // Version:     v2.2 (change of phone number is possible) 
 // commment:     to add 
