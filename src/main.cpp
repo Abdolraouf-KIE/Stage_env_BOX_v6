@@ -75,6 +75,9 @@ String debugTopic= "v1/gateway/smsserial" ;
 
 String Heartbeat;
 unsigned long previousMillis=0;
+unsigned long previousMillis2ON;
+int count2ON=0;
+
 unsigned long currentMillis;
 unsigned long interval=600000; //interval for heartbeat
 unsigned long heart_interval=300000; //interval for heartbeat
@@ -557,8 +560,29 @@ void read_io() {
   SerialMon.print("|");
   read_ioString = read_ioString + String("|");
   // SerialMon.print(read_ioString);
-
   currentMillis= millis();
+
+  if ((read_ioString=="|0|0|1|0|0|" || read_ioString=="|0|0|0|0|1|" || read_ioString=="|0|0|0|1|0|") && (unsigned long)(currentMillis - previousMillis2ON) >= 5000)
+  {
+    /* code */
+    count2ON++;
+    previousMillis2ON = currentMillis;
+  }else {
+    if ((unsigned long)(currentMillis - previousMillis2ON) >= 8000){
+      count2ON=0;
+      previousMillis2ON = currentMillis;
+    }
+  }
+  
+  if (count2ON==2)
+  {
+    String AllAlarms2ON=AllAlarms+String("\"Colour\":\"-1\",\"Light\":1, \"AmberFlashing\":-1, \"smsserial\": \"")+String(read_ioString)+String("\"}}]}");
+    intMQTTdateTime= (intMQTTdateTime + (unsigned long)(millis() - Zeromillis)/1000);
+    AllAlarms2ON= String("{\"") + String(ID)+ String("\": [{\"ts\": ") +String(intMQTTdateTime)+ AllAlarms2ON ;
+    sendMQTT(AllAlarms2ON, topic);
+    count2ON=0;
+  }
+
   if (read_ioString!=last_ioRead || (unsigned long)(currentMillis - previousMillis) >= heart_interval)
   {
     // String("{" + ID + ": [{\"ts\": " + String(ts) + "values\": {\"TNB\":0, "ELCB":0,"Colour":"Red","Light":0, "AmberFlashing":"false"}}]}
