@@ -77,7 +77,7 @@ String Heartbeat;
 unsigned long previousMillis=0;
 unsigned long currentMillis;
 unsigned long interval=600000; //interval for heartbeat
-
+unsigned long heart_interval=300000; //interval for heartbeat
 // SIM card PIN (leave empty, if not defined)
 const char simPIN[]   = "";
 // Configure TinyGSM library
@@ -557,7 +557,9 @@ void read_io() {
   SerialMon.print("|");
   read_ioString = read_ioString + String("|");
   // SerialMon.print(read_ioString);
-  if (read_ioString!=last_ioRead)
+
+  currentMillis= millis();
+  if (read_ioString!=last_ioRead || (unsigned long)(currentMillis - previousMillis) >= heart_interval)
   {
     // String("{" + ID + ": [{\"ts\": " + String(ts) + "values\": {\"TNB\":0, "ELCB":0,"Colour":"Red","Light":0, "AmberFlashing":"false"}}]}
     reconnect();
@@ -567,6 +569,7 @@ void read_io() {
     read_ioString=String("{\"") + String(ID)+ String("\": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String("0") + String(", \"ELCB\":") + String("0") +String(",\"Colour\":\"-1\",\"Light\":-1, \"AmberFlashing\":-1, \"smsserial\": \"")+String(read_ioString)+String("\"}}]}");
     // read_ioString=String("{") + String(ID)+ String(": [{\"ts\": ") +String(intMQTTdateTime)+ String(", \"values\": {\"TNB\":") + String(TNB) + String(", \"ELCB\":") + String(ELCB) +String(",\"Colour\":\"Red\",\"Light\":0, \"AmberFlashing\":1}}]}");
     sendMQTT(read_ioString,topic);
+    previousMillis = currentMillis;
   }
   read_ioString=String("");
 }
